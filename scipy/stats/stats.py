@@ -584,11 +584,30 @@ def hmean(a, axis=0, dtype=None):
         raise ValueError("Harmonic mean only defined if all elements greater than zero")
 
 
+def _sorted_mode1d(a):
+    """
+    Returns the mode and count of a sorted 1-D array.
+    """
+    # These three lines are equivalent to:
+    #     mask = np.concatenate(([True], a[1:] != a[:-1], [True]))
+    mask = np.empty((len(a) + 1,), dtype=bool)
+    mask[[0, -1]] = True
+    np.not_equal(a[1:], a[:-1], out=mask[1:-1])
+
+    idx, = np.nonzero(mask)
+    counts = idx[1:] - idx[:-1]
+    max_idx = np.argmax(counts)
+    max_count = counts[max_idx]
+    max_val = a[idx[max_idx]]
+
+    return max_val, max_count
+
+
 def mode(a, axis=0):
     """
     Returns an array of the modal (most common) value in the passed array.
 
-    If there is more than one such value, only the first is returned.
+    If there is more than one such value, only the smallest is returned.
     The bin-count for the modal bins is also returned.
 
     Parameters
@@ -623,18 +642,29 @@ def mode(a, axis=0):
 
     """
     a, axis = _chk_asarray(a, axis)
-    scores = np.unique(np.ravel(a))       # get ALL unique values
-    testshape = list(a.shape)
-    testshape[axis] = 1
-    oldmostfreq = np.zeros(testshape, dtype=a.dtype)
-    oldcounts = np.zeros(testshape)
-    for score in scores:
-        template = (a == score)
-        counts = np.expand_dims(np.sum(template, axis), axis)
-        mostfrequent = np.where(counts > oldcounts, score, oldmostfreq)
-        oldcounts = np.maximum(counts, oldcounts)
-        oldmostfreq = mostfrequent
-    return mostfrequent, oldcounts
+
+    shape = a.shape
+    len_ = shape[axis]
+    # 'axis' is in bounds (last line), make it positive
+    if axis < 0:
+        axis += a.ndim
+
+    # move the intended axis to the end of the shape and reshape to 2D
+    a = np.rollaxis(a, axis, a.ndim).reshape(-1, len_)
+    a = np.sort(a)
+
+    mostfrequent = np.empty((a.shape[0], 1), dtype=a.dtype)
+    counts = np.empty((a.shape[0], 1), dtype=np.intp)
+
+    for idx, subarr in enumerate(a):
+        mostfrequent[idx], counts[idx] = _sorted_mode1d(subarr)
+
+    # Recover the original shape
+    newshape = shape[:axis] + shape[axis+1:] + (1,)
+    counts = np.rollaxis(counts.reshape(newshape), -1, axis)
+    mostfrequent = np.rollaxis(mostfrequent.reshape(newshape), -1, axis)
+
+    return mostfrequent, counts
 
 
 def mask_to_limits(a, limits, inclusive):
