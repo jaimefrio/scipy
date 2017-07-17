@@ -41,6 +41,7 @@
 #define NO_IMPORT_ARRAY
 #include "nd_image.h"
 #undef NO_IMPORT_ARRAY
+#include "ni_data_structures.h"
 
 #include <stdlib.h>
 #include <float.h>

@@ -20,7 +20,8 @@ def configuration(parent_package='', top_path=None):
         sources=["src/nd_image.c","src/ni_filters.c",
                  "src/ni_fourier.c","src/ni_interpolation.c",
                  "src/ni_measure.c",
-                 "src/ni_morphology.c","src/ni_support.c"],
+                 "src/ni_morphology.c","src/ni_support.c",
+                 "src/ni_data_structures.c"],
         include_dirs=include_dirs,
         **numpy_nodepr_api)
 
