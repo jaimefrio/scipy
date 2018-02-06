@@ -188,25 +188,21 @@ static PyObject *Py_Correlate1D(PyObject *obj, PyObject *args)
     int axis, mode;
     double cval;
     npy_intp origin;
-
-    if (!PyArg_ParseTuple(args, "O&O&iO&idn" ,
-                          NI_ObjectToInputArray, &input,
-                          NI_ObjectToInputArray, &weights, &axis,
-                          NI_ObjectToOutputArray, &output, &mode, &cval,
-                          &origin))
+    if (!PyArg_ParseTuple(args, "O!O!iO!idn" ,
+                          &PyArray_Type, &input, &PyArray_Type, &weights,
+                          &axis, &PyArray_Type, &output, &mode, &cval,
+                          &origin)) {
         goto exit;
-
+    }
     NI_Correlate1D(input, weights, axis, output, (NI_ExtendMode)mode, cval,
                    origin);
-    #ifdef HAVE_WRITEBACKIFCOPY
-        PyArray_ResolveWritebackIfCopy(output);
-    #endif
 
 exit:
-    Py_XDECREF(input);
-    Py_XDECREF(weights);
-    Py_XDECREF(output);
-    return PyErr_Occurred() ? NULL : Py_BuildValue("");
+    if (PyErr_Occurred()) {
+        return NULL;
+    }
+    Py_RETURN_NONE;
+
 }
 
 static PyObject *Py_Correlate(PyObject *obj, PyObject *args)

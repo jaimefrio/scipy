@@ -49,6 +49,10 @@ eps = 1e-12
 def sumsq(a, b):
     return math.sqrt(((a - b)**2).sum())
 
+integer_types = [numpy.int8, numpy.uint8, numpy.int16, numpy.uint16,
+                 numpy.int32, numpy.uint32, numpy.int64, numpy.uint64]
+float_types = [numpy.float32, numpy.float64]
+all_types = integer_types + float_types
 
 class TestNdimage:
     def setup_method(self):
@@ -483,15 +487,15 @@ class TestNdimage:
                                                             output=otype)
         assert_array_almost_equal(output1, output2)
 
-    def test_prewitt01(self):
-        for type in self.types:
-            array = numpy.array([[3, 2, 5, 1, 4],
-                                    [5, 8, 3, 7, 1],
-                                    [5, 6, 9, 3, 5]], type)
-            t = ndimage.correlate1d(array, [-1.0, 0.0, 1.0], 0)
-            t = ndimage.correlate1d(t, [1.0, 1.0, 1.0], 1)
-            output = ndimage.prewitt(array, 0)
-            assert_array_almost_equal(t, output)
+    @pytest.mark.parametrize('type', all_types)
+    def test_prewitt01(self, type):
+        array = numpy.array([[3, 2, 5, 1, 4],
+                            [5, 8, 3, 7, 1],
+                            [5, 6, 9, 3, 5]], type)
+        t = ndimage.correlate1d(array, [-1.0, 0.0, 1.0], 0)
+        t = ndimage.correlate1d(t, [1.0, 1.0, 1.0], 1)
+        output = ndimage.prewitt(array, 0)
+        assert_array_almost_equal(t, output)
 
     def test_prewitt02(self):
         for type in self.types:

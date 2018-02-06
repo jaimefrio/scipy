@@ -406,5 +406,5 @@ def test_gaussian_filter():
     # gh-8207
     data = np.array([1],dtype = np.float16)
     sigma = 1.0
-    with assert_raises(RuntimeError):
+    with assert_raises(TypeError):
         sndi.gaussian_filter(data,sigma)

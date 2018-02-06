@@ -32,8 +32,7 @@ from __future__ import division, print_function, absolute_import
 
 import math
 import numpy
-from . import _ni_support
-from . import _nd_image
+from . import _ni_support, _nd_image, convert
 from scipy.misc import doccer
 from scipy._lib._version import NumpyVersion
 
@@ -118,6 +117,12 @@ docfiller = doccer.filldoc(docdict)
 
 
 @docfiller
+@convert.function_args(
+    input=convert.to_input_array,
+    weights=convert.to_1d_weights_array,
+    axis=convert.to_valid_axis.using('input'),
+    output=convert.to_output_array.using('input'),
+    origin=convert.to_valid_origin.using('weights'))
 def correlate1d(input, weights, axis=-1, output=None, mode="reflect",
                 cval=0.0, origin=0):
     """Calculate a one-dimensional correlation along the given axis.
@@ -142,23 +147,11 @@ def correlate1d(input, weights, axis=-1, output=None, mode="reflect",
     >>> correlate1d([2, 8, 0, 4, 1, 9, 9, 0], weights=[1, 3])
     array([ 8, 26,  8, 12,  7, 28, 36,  9])
     """
-    input = numpy.asarray(input)
-    if numpy.iscomplexobj(input):
-        raise TypeError('Complex type not supported')
-    output, return_value = _ni_support._get_output(output, input)
-    weights = numpy.asarray(weights, dtype=numpy.float64)
-    if weights.ndim != 1 or weights.shape[0] < 1:
-        raise RuntimeError('no filter weights given')
-    if not weights.flags.contiguous:
-        weights = weights.copy()
-    axis = _ni_support._check_axis(axis, input.ndim)
-    if (len(weights) // 2 + origin < 0) or (len(weights) // 2 +
-                                            origin > len(weights)):
-        raise ValueError('invalid origin')
     mode = _ni_support._extend_mode_to_code(mode)
-    _nd_image.correlate1d(input, weights, axis, output, mode, cval,
-                          origin)
-    return return_value
+    with convert.to_output_array(output) as output_array:
+        _nd_image.correlate1d(input, weights, axis, output_array, mode, cval,
+                              origin)
+    return output
 
 
 @docfiller
