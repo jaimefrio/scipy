@@ -30,6 +30,7 @@
  */
 
 #include "ni_support.h"
+#include "ni_lbiter.h"
 #include "ni_filters.h"
 #include <math.h>
 
@@ -301,72 +302,49 @@ exit:
     return PyErr_Occurred() ? 0 : 1;
 }
 
+
 int
 NI_UniformFilter1D(PyArrayObject *input, npy_intp filter_size,
                    int axis, PyArrayObject *output, NI_ExtendMode mode,
                    double cval, npy_intp origin)
 {
-    npy_intp lines, kk, ll, length, size1, size2;
-    int more;
-    double *ibuffer = NULL, *obuffer = NULL;
-    NI_LineBuffer iline_buffer, oline_buffer;
+    LBIter *lbiter;
+    const double *in_buffer;
+    double *out_buffer;
+    const npy_intp line_len = PyArray_DIM(input, axis);
     NPY_BEGIN_THREADS_DEF;
 
-    size1 = filter_size / 2;
-    size2 = filter_size - size1 - 1;
-    /* allocate and initialize the line buffers: */
-    lines = -1;
-    if (!NI_AllocateLineBuffer(input, axis, size1 + origin, size2 - origin,
-                                                         &lines, BUFFER_SIZE, &ibuffer))
-        goto exit;
-    if (!NI_AllocateLineBuffer(output, axis, 0, 0, &lines, BUFFER_SIZE,
-                                                         &obuffer))
-        goto exit;
-    if (!NI_InitLineBuffer(input, axis, size1 + origin, size2 - origin,
-                                                            lines, ibuffer, mode, cval, &iline_buffer))
-        goto exit;
-    if (!NI_InitLineBuffer(output, axis, 0, 0, lines, obuffer, mode, 0.0,
-                                                 &oline_buffer))
-        goto exit;
+    lbiter = LBIter_New(input, axis, output, filter_size, origin, mode, cval, 0);
+    if (lbiter == NULL) {
+        return NPY_FAIL;
+    }
+    in_buffer = LBIter_GetInputBuffer(lbiter);
+    out_buffer = LBIter_GetOutputBuffer(lbiter);
+
     NPY_BEGIN_THREADS;
-    length = PyArray_NDIM(input) > 0 ? PyArray_DIM(input, axis) : 1;
-
-    /* iterate over all the array lines: */
     do {
-        /* copy lines from array to buffer: */
-        if (!NI_ArrayToLineBuffer(&iline_buffer, &lines, &more)) {
-            goto exit;
-        }
-        /* iterate over the lines in the buffers: */
-        for(kk = 0; kk < lines; kk++) {
-            /* get lines: */
-            double *iline = NI_GET_LINE(iline_buffer, kk);
-            double *oline = NI_GET_LINE(oline_buffer, kk);
-            /* do the uniform filter: */
-            double tmp = 0.0;
-            double *l1 = iline;
-            double *l2 = iline + filter_size;
-            for (ll = 0; ll < filter_size; ++ll) {
-                tmp += iline[ll];
-            }
-            oline[0] = tmp / filter_size;
-            for (ll = 1; ll < length; ++ll) {
-                tmp += *l2++ - *l1++;
-                oline[ll] = tmp / filter_size;
-            }
-        }
-        /* copy lines from buffer to array: */
-        if (!NI_LineBufferToArray(&oline_buffer)) {
-            goto exit;
-        }
-    } while(more);
+        const double *in_front = in_buffer;
+        const double *in_back = in_buffer;
+        double *out = out_buffer;
+        double running_sum = 0.0;
+        npy_intp i;
 
- exit:
+        for(i = 0; i < filter_size; ++i) {
+            running_sum += *in_front++;
+        }
+        *out++ = running_sum / filter_size;
+
+        for (i = 1; i < line_len; ++i) {
+            running_sum += *in_front++ - *in_back++;
+            *out++ = running_sum / filter_size;
+        }
+    } while (LBIter_Next(lbiter));
     NPY_END_THREADS;
-    free(ibuffer);
-    free(obuffer);
-    return PyErr_Occurred() ? 0 : 1;
+
+    LBIter_Delete(lbiter);
+    return NPY_SUCCEED;
 }
+
 
 #define INCREASE_RING_PTR(ptr) \
     (ptr)++;                   \
